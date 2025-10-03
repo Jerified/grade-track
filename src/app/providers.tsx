@@ -154,9 +154,9 @@ export function ExamsProvider({ children }: { children: React.ReactNode }) {
   const [filters, setFiltersState] = useState<Filters>({ query: "", subject: null, dateRange: null })
 
   useEffect(() => {
-    // Clear old data and use fresh mock data
-    localStorage.removeItem('exams')
-    setExams(MOCK)
+    // Load from localStorage or use mock data if empty
+    const stored = loadExamsFromStorage()
+    setExams(stored.length > 0 ? stored : MOCK)
   }, [])
 
   useEffect(() => {
