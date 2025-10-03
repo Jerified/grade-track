@@ -1,5 +1,5 @@
 "use client"
-import { useMemo, useState } from "react"
+import { useMemo, useState, useCallback, memo, useEffect } from "react"
 import { useExams } from "./providers"
 import { Card, GradeButton, BottomActionBar, Modal } from "./components/ui"
 import ExamForm from "./components/forms/exam-form"
@@ -8,9 +8,57 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import { Delete02Icon, SearchIcon, CalendarIcon, Calculator01Icon } from "@hugeicons/core-free-icons"
 import { IoMdArrowDropdown } from "react-icons/io"
 import { FiEdit } from "react-icons/fi"
-import { downloadJson } from "@/lib/utils"
+import { downloadJson, Exam, ExamDraft } from "@/lib/utils"
 import { AnimatePresence, motion } from "framer-motion"
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
+
+// Memoized modal wrapper to prevent parent re-renders
+const ExamFormModal = memo(({
+  open,
+  editing,
+  onClose,
+  onSubmit
+}: {
+  open: boolean
+  editing: Exam | undefined
+  onClose: () => void
+  onSubmit: (data: ExamDraft) => void
+}) => (
+  <Modal
+    open={open}
+    onClose={onClose}
+    title="Create/Edit Exam"
+  >
+    <ExamForm
+      initial={editing}
+      onCancel={onClose}
+      onSubmit={onSubmit}
+    />
+  </Modal>
+))
+ExamFormModal.displayName = "ExamFormModal"
+
+// Memoized grading modal wrapper
+const GradingModal = memo(({
+  exam,
+  onClose,
+  onSubmit
+}: {
+  exam: Exam | null
+  onClose: () => void
+  onSubmit: (studentScore: number) => void
+}) => {
+  if (!exam) return null
+  return (
+    <GradeModal
+      exam={exam}
+      open={true}
+      onClose={onClose}
+      onSubmit={onSubmit}
+    />
+  )
+})
+GradingModal.displayName = "GradingModal"
 
 export default function Home() {
   const { filtered, exams, deleteExam, createExam, updateExam, filters, setFilters } = useExams()
@@ -24,7 +72,30 @@ export default function Home() {
   const [gradingExamId, setGradingExamId] = useState<string | null>(null)
 
   const editing = useMemo(() => exams.find((e) => e.id === editingId), [editingId, exams])
-  const gradingExam = useMemo(() => exams.find((e) => e.id === gradingExamId), [gradingExamId, exams])
+  const gradingExam = useMemo(() => exams.find((e) => e.id === gradingExamId) ?? null, [gradingExamId, exams])
+
+  const handleCloseModal = useCallback(() => {
+    setModalOpen(false)
+    setEditingId(null)
+  }, [])
+
+  const handleCloseGrading = useCallback(() => {
+    setGradingExamId(null)
+  }, [])
+
+  const handleFormSubmit = useCallback((data: ExamDraft) => {
+    if (editing) {
+      updateExam(editing.id, data)
+    } else {
+      createExam(data)
+    }
+    setModalOpen(false)
+    setEditingId(null)
+  }, [editing, updateExam, createExam])
+
+  const handleGradeSubmit = useCallback((examId: string) => (studentScore: number) => {
+    setGradingExamId(null)
+  }, [])
 
   const uniqueSubjects = useMemo(() => {
     const subjects = new Set(exams.map(e => e.course))
@@ -38,9 +109,8 @@ export default function Home() {
     "Search Mat 202...",
   ]
 
-  // Cycle through placeholders automatically
-  useMemo(() => {
-    if (filters.query) return // Don't animate if user is typing
+  useEffect(() => {
+    if (filters.query) return
     const interval = setInterval(() => {
       setCurrentPlaceholder((prev) => (prev + 1) % placeholders.length)
     }, 3000)
@@ -253,31 +323,17 @@ export default function Home() {
         </div>
       </div>
       <BottomActionBar onCreate={() => setModalOpen(true)} onExport={() => downloadJson("exams.json", exams)} />
-      <Modal
+      <ExamFormModal
         open={modalOpen}
-        onClose={() => { setModalOpen(false); setEditingId(null) }}
-        title={editing ? "Create/Edit Exam" : "Create/Edit Exam"}
-      >
-        <ExamForm
-          initial={editing ?? undefined}
-          onCancel={() => { setModalOpen(false); setEditingId(null) }}
-          onSubmit={(data) => {
-            if (editing) updateExam(editing.id, data)
-            else createExam(data)
-            setModalOpen(false)
-            setEditingId(null)
-          }}
-        />
-      </Modal>
+        editing={editing}
+        onClose={handleCloseModal}
+        onSubmit={handleFormSubmit}
+      />
       {gradingExam && (
-        <GradeModal
+        <GradingModal
           exam={gradingExam}
-          open={!!gradingExamId}
-          onClose={() => setGradingExamId(null)}
-          onSubmit={(studentScore) => {
-            // You can add logic here to store the grade
-            console.log(`Graded ${gradingExam.title} with score: ${studentScore}`)
-          }}
+          onClose={handleCloseGrading}
+          onSubmit={handleGradeSubmit(gradingExam.id)}
         />
       )}
     </div>

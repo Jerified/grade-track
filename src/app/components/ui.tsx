@@ -328,7 +328,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
   }, [open, onClose])
 
   return (
-    <AnimatePresence>
+    <AnimatePresence mode="wait">
       {open && (
         <motion.div
           role="dialog"
@@ -337,14 +337,15 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
         >
           <div className="absolute inset-0 bg-black/30 dark:bg-black/60" onClick={onClose} />
           <motion.div
             className="relative w-full max-w-lg rounded-3xl bg-[#f3e6d9] dark:bg-[#1a1f3a] p-6 border border-black/10 dark:border-[#2a2f4a]"
-            initial={{ y: 20, scale: 0.98, opacity: 0 }}
-            animate={{ y: 0, scale: 1, opacity: 1 }}
-            exit={{ y: 20, scale: 0.98, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 260, damping: 20 }}
+            initial={{ y: 10, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 10, opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
           >
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-bold text-black/90 dark:text-gray-100">{title}</h3>

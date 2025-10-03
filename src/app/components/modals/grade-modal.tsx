@@ -1,7 +1,8 @@
 "use client"
-import { useState } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Modal, Button, TextInput, Label } from "../ui"
 import { Exam } from "@/lib/utils"
+import confetti from "canvas-confetti"
 
 type GradeModalProps = {
   exam: Exam
@@ -13,6 +14,41 @@ type GradeModalProps = {
 export default function GradeModal({ exam, open, onClose, onSubmit }: GradeModalProps) {
   const [studentScore, setStudentScore] = useState("")
   const [error, setError] = useState("")
+  const [isMounted, setIsMounted] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
+  const triggerFireworks = () => {
+    if (!isMounted) return
+    const duration = 5 * 1000
+    const animationEnd = Date.now() + duration
+    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 }
+
+    const randomInRange = (min: number, max: number) =>
+      Math.random() * (max - min) + min
+
+    const interval = window.setInterval(() => {
+      const timeLeft = animationEnd - Date.now()
+
+      if (timeLeft <= 0) {
+        return clearInterval(interval)
+      }
+
+      const particleCount = 50 * (timeLeft / duration)
+      confetti({
+        ...defaults,
+        particleCount,
+        origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
+      })
+      confetti({
+        ...defaults,
+        particleCount,
+        origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
+      })
+    }, 250)
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -28,27 +64,36 @@ export default function GradeModal({ exam, open, onClose, onSubmit }: GradeModal
       return
     }
 
+    const percentage = (score / exam.maxPoints) * 100
+
+    if (percentage >= exam.passingThreshold) {
+      triggerFireworks()
+    }
+
     onSubmit(score)
     setStudentScore("")
     setError("")
-    onClose()
+
+    setTimeout(() => {
+      onClose()
+    }, 1000)
   }
 
-  const calculatePercentage = () => {
+  const gradeCalculations = useMemo(() => {
     const score = parseFloat(studentScore)
-    if (isNaN(score)) return 0
-    return ((score / exam.maxPoints) * 100).toFixed(1)
-  }
-
-  const getGradeStatus = () => {
-    const score = parseFloat(studentScore)
-    if (isNaN(score)) return ""
-    const percentage = (score / exam.maxPoints) * 100
-    if (percentage >= exam.passingThreshold) {
-      return "Pass ✓"
+    if (isNaN(score)) {
+      return { percentage: 0, status: "", isPassing: false }
     }
-    return "Fail ✗"
-  }
+
+    const percentage = (score / exam.maxPoints) * 100
+    const isPassing = percentage >= exam.passingThreshold
+
+    return {
+      percentage: percentage.toFixed(1),
+      status: isPassing ? "Pass ✓" : "Fail ✗",
+      isPassing
+    }
+  }, [studentScore, exam.maxPoints, exam.passingThreshold])
 
   return (
     <Modal open={open} onClose={onClose} title="Grade Exam">
@@ -91,16 +136,16 @@ export default function GradeModal({ exam, open, onClose, onSubmit }: GradeModal
           {error && <p className="text-sm text-red-600 dark:text-red-400 font-medium">{error}</p>}
         </div>
 
-        {studentScore && !error && (
+        {studentScore && !error && gradeCalculations.status && (
           <div className="space-y-2 bg-[#e8ddd0] dark:bg-[#252b4a] p-4 rounded-xl border-2 border-black/10 dark:border-[#2a2f4a]">
             <div className="flex items-center justify-between py-1">
               <span className="text-sm font-medium text-black/70 dark:text-gray-300">Percentage:</span>
-              <span className="font-bold text-xl text-black dark:text-gray-100">{calculatePercentage()}%</span>
+              <span className="font-bold text-xl text-black dark:text-gray-100">{gradeCalculations.percentage}%</span>
             </div>
             <div className="flex items-center justify-between py-1 border-t border-black/10 dark:border-[#3a3f5a] pt-2">
               <span className="text-sm font-medium text-black/70 dark:text-gray-300">Status:</span>
-              <span className={`font-bold text-lg ${parseFloat(studentScore) / exam.maxPoints * 100 >= exam.passingThreshold ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                {getGradeStatus()}
+              <span className={`font-bold text-lg ${gradeCalculations.isPassing ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                {gradeCalculations.status}
               </span>
             </div>
           </div>
